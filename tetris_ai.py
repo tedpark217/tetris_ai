@@ -18,6 +18,11 @@ from gui import Gui
 import time
 import multiprocessing
 
+import torch
+from torch import nn
+from torch import optim
+from torch.nn import functional as F
+
 # size dependent
 shape_main_grid = (-1, GAME_BOARD_HEIGHT, GAME_BOARD_WIDTH, 1)
 if STATE_INPUT == 'short':
@@ -44,117 +49,71 @@ num_search_best = 6
 num_search_rd = 6
 env_debug = None
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def make_model_conv2d_v1():
-    main_grid_input = keras.Input(shape=shape_main_grid[1:], name="main_grid_input")
-    a = layers.Conv2D(
-        64, 6, activation="relu", input_shape=shape_main_grid[1:]
-    )(main_grid_input)
-    a = layers.Conv2D(32, (3, 3), activation="relu")(a)
-    a = layers.MaxPool2D(pool_size=(13, 3))(a)
-    a = layers.Flatten()(a)
+class RLModel(nn.Module):
+  def __init__(self, input_size):
+    super(RLModel, self).__init__()
+    self.conv1 = nn.Conv2d(in_channels=input_size, out_channels=64, kernel_size=6)
+    self.conv2 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3)
+    self.maxpool1 = nn.MaxPool2d(kernel_size=(13, 3))
+    
+    self.conv3 = nn.Conv2d(in_channels=input_size, out_channels=128, kernel_size=4)
+    self.conv4 = nn.Conv2d(in_channels=128, out_channels=32, kernel_size=3)
+    self.maxpool2 = nn.MaxPool2d(kernel_size=(15, 5))
 
-    b = layers.Conv2D(
-        128, 4, activation="relu", input_shape=shape_main_grid[1:]
-    )(main_grid_input)
-    b = layers.Conv2D(32, (3, 3), activation="relu")(b)
-    b = layers.MaxPool2D(pool_size=(15, 5))(b)
-    b = layers.Flatten()(b)
+    self.dense1 = nn.Linear(110, 64)
+    self.dense2 = nn.Linear(64, 128)
+    self.dense3 = nn.Linear(128, 1)
 
-    hold_next_input = keras.Input(shape=shape_hold_next[1:], name="hold_next_input")
+    self.optimizer = torch.optim.AdamW(self.parameters(), lr=0.001)
 
-    x = layers.concatenate([a, b, hold_next_input])
-    x = layers.Dense(64, activation="relu")(x)
-    x = layers.Dense(128, activation="relu")(x)
-    critic_output = layers.Dense(1)(x)  # activation=None -> 'linear'
+  def forward(self, input1, input2):
+    a = F.relu(self.conv1(input1))
+    a = F.relu(self.conv2(a))
+    a = self.maxpool1(a)
+    a = a.view(a.size(0),-1)
 
-    model_new = keras.Model(
-        inputs=[main_grid_input, hold_next_input],
-        outputs=critic_output
-    )
+    b = F.relu(self.conv3(input1))
+    b = F.relu(self.conv4(b))
+    b = self.maxpool2(b)
+    b = b.view(b.size(0),-1)
+    
+    #hold_next_input = keras.Input(shape=shape_hold_next[1:], name="hold_next_input") 
+    #or torch.randn
+    #c = torch.ones(shape_hold_next[1:])
 
-    model_new.summary()
+    x = torch.cat([a, b, input2], dim=1)
+    x = F.relu(self.dense1(x))
+    x = F.relu(self.dense2(x))
+    output = self.dense3(x)
 
+    return output
+
+'''def make_model_conv2d_v0():e
     return model_new
-
-
-def make_model_conv2d_v0():
-    main_grid_input = keras.Input(shape=shape_main_grid[1:], name="main_grid_input")
-    a = layers.Conv2D(
-        128, 6, activation="relu", input_shape=shape_main_grid[1:]
-    )(main_grid_input)
-    a1 = layers.MaxPool2D(pool_size=(15, 5), strides=(1, 1))(a)
-    a1 = layers.Flatten()(a1)
-    a2 = layers.AvgPool2D(pool_size=(15, 5))(a)
-    a2 = layers.Flatten()(a2)
-
-    b = layers.Conv2D(
-        256, 4, activation="relu", input_shape=shape_main_grid[1:]
-    )(main_grid_input)
-    b1 = layers.MaxPool2D(pool_size=(17, 7), strides=(1, 1))(b)
-    b1 = layers.Flatten()(b1)
-    b2 = layers.AvgPool2D(pool_size=(17, 7))(b)
-    b2 = layers.Flatten()(b2)
-
-    hold_next_input = keras.Input(shape=shape_hold_next[1:], name="hold_next_input")
-
-    x = layers.concatenate([a1, a2, b1, b2, hold_next_input])
-    x = layers.Dense(128, activation="relu")(x)
-    x = layers.Dense(256, activation="relu")(x)
-    x = layers.Dense(128, activation="relu")(x)
-    critic_output = layers.Dense(1)(x)  # activation=None -> 'linear'
-
-    model_new = keras.Model(
-        inputs=[main_grid_input, hold_next_input],
-        outputs=critic_output
-    )
-
-    model_new.summary()
-
-    return model_new
-
 
 def make_model_dense():
-    dense_input = keras.Input(shape=shape_dense[1:], name="input")
-
-    x = layers.Dense(256, activation="relu")(dense_input)
-    x = layers.Dense(128, activation="relu")(x)
-    critic_output = layers.Dense(1)(x)  # activation=None -> 'linear'
-
-    model_new = keras.Model(
-        inputs=dense_input,
-        outputs=critic_output
-    )
-
-    model_new.summary()
-
-    return model_new
-
+    return model_new'''
 
 def load_model(filepath=None):
-    if STATE_INPUT == 'short' or STATE_INPUT == 'long':
-        model_loaded = make_model_conv2d_v1()
-    elif STATE_INPUT == 'dense':
-        model_loaded = make_model_dense()
+    if STATE_INPUT == 'short' or STATE_INPUT == 'long' or STATE_INPUT == 'dense':
+        model_loaded = RLModel(input_size=1).to(device)
+    #elif STATE_INPUT == 'dense':
+    #    model_loaded = make_model_dense()
     else:
         model_loaded = None
         sys.stderr.write('STATE_INPUT is wrong. Exit...')
         exit()
 
-    model_loaded.compile(
-        optimizer=keras.optimizers.Adam(0.001),
-        # loss='huber_loss',
-        loss='mean_squared_error',
-        metrics='mean_squared_error'
-    )
     if filepath is not None:
-        model_loaded.load_weights(filepath)
+        model = RLModel(input_size=1).to(device)
+        model.load_state_dict(torch.load(filepath))
     else:
-        model_loaded.save(FOLDER_NAME + 'whole_model/outer_{}'.format(0))
+        torch.save(model_loaded.state_dict(), FOLDER_NAME + 'whole_model/outer_{}'.format(0))
         print('model initial state has been saved')
 
     return model_loaded
-
 
 def ai_play(model, max_games=100, mode='piece', is_gui_on=True):
     max_steps_per_episode = 2000
@@ -172,9 +131,9 @@ def ai_play(model, max_games=100, mode='piece', is_gui_on=True):
         for step in range(max_steps_per_episode):
             states, add_scores, dones, _, _, moves, _ = env.get_all_possible_states_input()
             rewards = get_reward(add_scores, dones)
-            q = rewards + model(split_input(states))
+            i1, i2 = split_input(states)
+            q = rewards + model(i1, i2).detach().numpy()
             best = tf.argmax(q).numpy()[0]
-
             if mode == 'step':
                 best_moves = moves[best]
 
@@ -306,9 +265,12 @@ def search_one_step(model, gamestates_old, env, gamestates_steps_old=None, rewar
 
     s_all = np.concatenate(s_all)
     r_all = np.concatenate(r_all)
-    q = model(split_input(s_all)) + r_all
+    i1, i2 = split_input(s_all)
+    q = model(i1, i2).detach().numpy() + r_all
+    q = torch.tensor(q)
 
-    arg_sorted = tf.argsort(tf.reshape(q, -1), direction='DESCENDING').numpy().tolist()
+    arg_sorted = torch.argsort(q.view(-1), descending=True).numpy().tolist()
+    
     gamestates_chosen = list()
     reward_prev_chosen = list()
     gamestates_steps_chosen = list()
@@ -348,8 +310,11 @@ def split_input(states):
     if STATE_INPUT == 'dense':
         return states
     else:
-        in1, in2 = tf.split(states, [GAME_BOARD_HEIGHT * GAME_BOARD_WIDTH, -1], axis=1)
-        return tf.reshape(in1, shape_main_grid), in2
+        states = torch.tensor(states)
+        divide = GAME_BOARD_HEIGHT * GAME_BOARD_WIDTH
+        remainder = int(states.size(dim=1)) - divide
+        in1, in2 = torch.split(states, [divide, remainder], dim=1)
+        return in1.view((-1,1,20,10)).to(torch.float), in2.to(torch.float)
 
 
 def gamestates_to_training_data(env, gamestates_steps):
@@ -372,7 +337,9 @@ def gamestates_to_training_data(env, gamestates_steps):
 def get_data_from_playing_cnn2d(model_filename, target_size=8000, max_steps_per_episode=2000, proc_num=0,
                                 queue=None):
     tf.autograph.set_verbosity(3)
-    model = keras.models.load_model(model_filename)
+    model = RLModel(input_size=1).to(device)
+    model.load_state_dict(torch.load(model_filename))
+
     if model is None:
         print('ERROR: model has not been loaded. Check this part.')
         exit()
@@ -400,11 +367,14 @@ def get_data_from_playing_cnn2d(model_filename, target_size=8000, max_steps_per_
             pool_size = Tetromino.pool_size()
 
             # get the best first before modifying the last next
-            q = rewards + model(split_input(possible_states), training=False).numpy()
+            i1, i2 = split_input(possible_states)
+            model.eval()
+            q = rewards + model(i1, i2).detach().numpy()
             for j in range(len(dones)):
                 if dones[j]:
                     q[j] = rewards[j]
             best = tf.argmax(q).numpy()[0] + 0
+            model.train()
 
             # if hold was empty, then we don't know what's next; if hold was not empty, then we know what's next!
             if is_include_hold and not is_new_hold:
@@ -454,8 +424,9 @@ def get_data_from_playing_cnn2d(model_filename, target_size=8000, max_steps_per_
 
 def get_data_from_playing_search(model_filename, target_size=8000, max_steps_per_episode=1000, proc_num=0,
                                  queue=None):
-    tf.autograph.set_verbosity(3)
-    model = keras.models.load_model(model_filename)
+    #tf.autograph.set_verbosity(3)
+    model = RLModel(input_size=1).to(device)
+    model.load_state_dict(torch.load(model_filename))
     if model is None:
         print('ERROR: model has not been loaded. Check this part.')
         exit()
@@ -557,8 +528,11 @@ def train(model, outer_start=0, outer_max=100):
             for i in range(int(s.shape[0] / batch_training) + 1):
                 start = i * batch_training
                 end = min((i + 1) * batch_training, s.shape[0])
-                target.append(
-                    model(split_input(s_[start:end]), training=False).numpy().reshape(-1) + r_[start:end])
+                model.eval()
+
+                i1, i2 = split_input(s_[start:end])
+                q = model(i1, i2).detach().numpy() + r_[start:end]
+                target.append(q)
             target = np.concatenate(target)
             # when it's gameover, Q[s'] must not be added
             for i in range(len(dones_)):
@@ -765,8 +739,10 @@ if __name__ == "__main__":
     elif MODE == 'ai_player_training':
         if OUT_START == 0:
             load_model()
-        model_load = keras.models.load_model(FOLDER_NAME + 'whole_model/outer_{}'.format(OUT_START))
+        model_load = RLModel(input_size=1).to(device)
+        model_load.load_state_dict(torch.load(FOLDER_NAME + 'whole_model/outer_{}'.format(OUT_START)))
         train(model_load, outer_start=OUT_START, outer_max=OUTER_MAX)
     elif MODE == 'ai_player_watching':
-        model_load = keras.models.load_model(FOLDER_NAME + 'whole_model/outer_{}'.format(OUT_START))
+        model_load = RLModel(input_size=1).to(device)
+        model_load.load_state_dict(torch.load(FOLDER_NAME + 'whole_model/outer_{}'.format(OUT_START)))
         ai_play_search(model_load, is_gui_on=True)
