@@ -22,6 +22,7 @@ import torch
 from torch import nn
 from torch import optim
 from torch.nn import functional as F
+from torch.utils.data import TensorDataset, DataLoader
 
 # size dependent
 shape_main_grid = (-1, GAME_BOARD_HEIGHT, GAME_BOARD_WIDTH, 1)
@@ -310,7 +311,8 @@ def split_input(states):
     if STATE_INPUT == 'dense':
         return states
     else:
-        states = torch.tensor(states)
+        if not torch.is_tensor(states):
+            states = torch.tensor(states)
         divide = GAME_BOARD_HEIGHT * GAME_BOARD_WIDTH
         remainder = int(states.size(dim=1)) - divide
         in1, in2 = torch.split(states, [divide, remainder], dim=1)
@@ -531,7 +533,7 @@ def train(model, outer_start=0, outer_max=100):
                 model.eval()
 
                 i1, i2 = split_input(s_[start:end])
-                q = model(i1, i2).detach().numpy() + r_[start:end]
+                q = model(i1, i2).detach().numpy().reshape(-1) + r_[start:end]
                 target.append(q)
             target = np.concatenate(target)
             # when it's gameover, Q[s'] must not be added
@@ -544,19 +546,18 @@ def train(model, outer_start=0, outer_max=100):
                 save_training_dataset_to_file(filename=FOLDER_NAME + 'dataset/dataset_{}.pkl'.format(outer),
                                               dataset=(s, target))
 
-            history = model.fit(split_input(s), target, batch_size=batch_training, epochs=epoch_training, verbose=0)
-            print('      loss = {:8.3f}   mse = {:8.3f}'.format(history.history['loss'][-1],
-                                                                history.history['mean_squared_error'][-1]))
+            baseline_train(model, s, target, batch_training, epoch_training)
 
-        model.save(FOLDER_NAME + 'whole_model/outer_{}'.format(outer))
-        model.save_weights(FOLDER_NAME + 'checkpoints_dqn/outer_{}'.format(outer))
+        torch.save(model.state_dict(), FOLDER_NAME + 'whole_model/outer_{}'.format(outer))
+        #model.save(FOLDER_NAME + 'whole_model/outer_{}'.format(outer))
+        #model.save_weights(FOLDER_NAME + 'checkpoints_dqn/outer_{}'.format(outer))
 
         time_outer_end = time.time()
         text_ = ''
         if outer == 1:
             text_ += f'input shapes: {shape_main_grid} {shape_hold_next} \n {shape_hold_next_description} \n'
 
-        text_ += 'outer = {:>4d} | pre-training avg score = {:>8.3f} | loss = {:>8.3f} | mse = {:>8.3f} |' \
+        '''text_ += 'outer = {:>4d} | pre-training avg score = {:>8.3f} | loss = {:>8.3f} | mse = {:>8.3f} |' \
                  ' dataset size = {:>7d} | new dataset size = {:>7d} | time elapsed: {:>6.1f} sec | coef = {} | penalty = {:>7d} | gamma = {:>6.3f} |' \
                  ' search best/rd = {}, {} |\n' \
             .format(outer, current_avg_score, history.history['loss'][-1], history.history['mean_squared_error'][-1],
@@ -564,7 +565,32 @@ def train(model, outer_start=0, outer_max=100):
                     num_search_best, num_search_rd
                     )
         append_record(text_)
-        print('   ' + text_)
+        print('   ' + text_)'''
+
+def baseline_train(model, inputs, target, batch_size, epochs):
+    criterion = nn.MSELoss()
+
+    inputs = torch.tensor(inputs)
+    target = torch.tensor(target)
+    dataset = TensorDataset(inputs, target)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+    for epoch_count in range(epochs):
+        losses = 0
+        model.train()
+
+        for batch_input, batch_target in dataloader:
+            in1, in2 = split_input(batch_input)
+            logits = model(in1, in2)
+            logits = logits.squeeze(1).to(torch.float)
+            loss = criterion(logits, batch_target.to(torch.float))
+            loss.backward()
+
+            model.optimizer.step()
+            model.zero_grad()
+            losses += loss.item()
+
+        print('Epoch', (epoch_count+1), '| Losses:', round(losses/len(dataloader),3))
 
 
 def save_buffer_to_file(filename, buffer):
