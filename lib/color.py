@@ -12,7 +12,7 @@ DARK_GRAY = (0, 0, 0)   #(64, 64, 64)
 PINK = (255, 175, 175)
 ORANGE = (255, 145, 12)
 PURPLE = (221, 10, 178)
-BORDER = (32, 79, 145)
+BORDER = (72, 93, 197)
 
 colors = [GRAY, RED, GREEN, CYAN, PURPLE, BLUE, ORANGE, YELLOW, PINK, (0, 237, 165), (22, 172, 237)]
 cmap = dict()
