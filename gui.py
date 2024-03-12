@@ -7,7 +7,6 @@ class RectC:
         self.rect = rect
         self.color = c
 
-
 MAIN_GRID_BEGIN_CORNER = (330, 19)
 ABOVE_GRID_BEGIN_CORNER = (330, -15)
 HOLD_GRID_BEGIN_CORNER = (210, 19)
@@ -19,6 +18,8 @@ SCORE_BOARD_RECTC = RectC((669, 459, 200, 200), color.LIGHT_GRAY)
 SCORE_BOARD_OUT = RectC((669, 459, 200, 200), color.BORDER)
 INFO_BOARD_RECTC = RectC((110, 459, 200, 200), color.LIGHT_GRAY)
 INFO_BOARD_OUT = RectC((110, 459, 200, 200), color.BORDER)
+
+HOLD_GRID_BORDER = RectC((206, 15, 108, 83), color.BORDER)
 
 WIN_SIZE = (1000, 700)
 
@@ -140,9 +141,13 @@ class Gui:
 
     def __paint_panels__(self):
         pygame.draw.rect(self.win, MAIN_BORAD_RECTC.color, MAIN_BORAD_RECTC.rect,7)
+        pygame.draw.rect(self.win, HOLD_GRID_BORDER.color, HOLD_GRID_BORDER.rect,5)
+        for i in range(5):
+            NEXT_GRID_BORDER = RectC((665, 15+(i*80), 108, 83), color.BORDER)
+            pygame.draw.rect(self.win, NEXT_GRID_BORDER.color, NEXT_GRID_BORDER.rect,5)
         # score text
         pygame.draw.rect(self.win, SCORE_BOARD_RECTC.color, SCORE_BOARD_RECTC.rect)
-        pygame.draw.rect(self.win, SCORE_BOARD_OUT.color, SCORE_BOARD_OUT.rect, 6)
+        pygame.draw.rect(self.win, SCORE_BOARD_OUT.color, SCORE_BOARD_OUT.rect, 5)
         lines = self.__score_board_text__.split('\n')
         i = 0
         for line in lines:
@@ -152,7 +157,7 @@ class Gui:
 
         # info text
         pygame.draw.rect(self.win, INFO_BOARD_RECTC.color, INFO_BOARD_RECTC.rect)
-        pygame.draw.rect(self.win, INFO_BOARD_OUT.color, INFO_BOARD_OUT.rect, 6)
+        pygame.draw.rect(self.win, INFO_BOARD_OUT.color, INFO_BOARD_OUT.rect, 5)
         lines = self.__info_board_text__.split('\n')
         i = 0
         for line in lines:
