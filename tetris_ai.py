@@ -17,9 +17,8 @@ import multiprocessing
 
 import torch
 from torch import nn
-from torch import optim
-from torch.nn import functional as F
 from torch.utils.data import TensorDataset, DataLoader
+from models import RLModel, NewModel
 
 # size dependent
 shape_main_grid = (-1, GAME_BOARD_HEIGHT, GAME_BOARD_WIDTH, 1)
@@ -49,64 +48,23 @@ env_debug = None
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-class RLModel(nn.Module):
-  def __init__(self, input_size):
-    super(RLModel, self).__init__()
-    self.conv1 = nn.Conv2d(in_channels=input_size, out_channels=64, kernel_size=6)
-    self.conv2 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3)
-    self.maxpool1 = nn.MaxPool2d(kernel_size=(13, 3))
-    
-    self.conv3 = nn.Conv2d(in_channels=input_size, out_channels=128, kernel_size=4)
-    self.conv4 = nn.Conv2d(in_channels=128, out_channels=32, kernel_size=3)
-    self.maxpool2 = nn.MaxPool2d(kernel_size=(15, 5))
-
-    self.dense1 = nn.Linear(110, 64)
-    self.dense2 = nn.Linear(64, 128)
-    self.dense3 = nn.Linear(128, 1)
-
-    self.optimizer = torch.optim.AdamW(self.parameters(), lr=0.001)
-
-  def forward(self, input1, input2):
-    a = F.relu(self.conv1(input1))
-    a = F.relu(self.conv2(a))
-    a = self.maxpool1(a)
-    a = a.view(a.size(0),-1)
-
-    b = F.relu(self.conv3(input1))
-    b = F.relu(self.conv4(b))
-    b = self.maxpool2(b)
-    b = b.view(b.size(0),-1)
-    
-    #hold_next_input = keras.Input(shape=shape_hold_next[1:], name="hold_next_input") 
-    #or torch.randn
-    #c = torch.ones(shape_hold_next[1:])
-
-    x = torch.cat([a, b, input2], dim=1)
-    x = F.relu(self.dense1(x))
-    x = F.relu(self.dense2(x))
-    output = self.dense3(x)
-
-    return output
-
-'''def make_model_conv2d_v0():e
-    return model_new
-
-def make_model_dense():
-    return model_new'''
-
 def load_model(filepath=None):
-    if STATE_INPUT == 'short' or STATE_INPUT == 'long' or STATE_INPUT == 'dense':
+    if MODEL_TYPE == 'RLModel':
         model_loaded = RLModel(input_size=1).to(device)
-    #elif STATE_INPUT == 'dense':
-    #    model_loaded = make_model_dense()
+    elif MODEL_TYPE == 'NewModel':
+        model_loaded = NewModel(input_size=1).to(device)
     else:
         model_loaded = None
-        sys.stderr.write('STATE_INPUT is wrong. Exit...')
+        sys.stderr.write('MODEL_TYPE is wrong. Exit...')
         exit()
 
     if filepath is not None:
-        model = RLModel(input_size=1).to(device)
-        model.load_state_dict(torch.load(filepath))
+        if MODEL_TYPE == 'RLModel':
+            model = RLModel(input_size=1).to(device)
+            model.load_state_dict(torch.load(filepath))
+        elif MODEL_TYPE == 'NewModel':
+            model = NewModel(input_size=1).to(device)
+            model.load_state_dict(torch.load(filepath))    
     else:
         torch.save(model_loaded.state_dict(), FOLDER_NAME + 'whole_model/outer_{}'.format(0))
         print('model initial state has been saved')
@@ -335,8 +293,12 @@ def gamestates_to_training_data(env, gamestates_steps):
 
 def get_data_from_playing_cnn2d(model_filename, target_size=8000, max_steps_per_episode=2000, proc_num=0,
                                 queue=None):
-    model = RLModel(input_size=1).to(device)
-    model.load_state_dict(torch.load(model_filename))
+    if MODEL_TYPE == 'RLModel':
+        model = RLModel(input_size=1).to(device)
+        model.load_state_dict(torch.load(model_filename))
+    elif MODEL_TYPE == 'NewModel':
+        model = NewModel(input_size=1).to(device)
+        model.load_state_dict(torch.load(model_filename))    
 
     if model is None:
         print('ERROR: model has not been loaded. Check this part.')
@@ -422,8 +384,13 @@ def get_data_from_playing_cnn2d(model_filename, target_size=8000, max_steps_per_
 
 def get_data_from_playing_search(model_filename, target_size=8000, max_steps_per_episode=1000, proc_num=0,
                                  queue=None):
-    model = RLModel(input_size=1).to(device)
-    model.load_state_dict(torch.load(model_filename))
+    if MODEL_TYPE == 'RLModel':
+        model = RLModel(input_size=1).to(device)
+        model.load_state_dict(torch.load(model_filename))
+    elif MODEL_TYPE == 'NewModel':
+        model = NewModel(input_size=1).to(device)
+        model.load_state_dict(torch.load(model_filename)) 
+        
     if model is None:
         print('ERROR: model has not been loaded. Check this part.')
         exit()
@@ -760,10 +727,17 @@ if __name__ == "__main__":
     elif MODE == 'ai_player_training':
         if OUT_START == 0:
             load_model()
-        model_load = RLModel(input_size=1).to(device)
+        if MODEL_TYPE == 'RLModel':
+            model_load = RLModel(input_size=1).to(device)
+        elif MODEL_TYPE == 'NewModel':
+            model_load = NewModel(input_size=1).to(device)
+
         model_load.load_state_dict(torch.load(FOLDER_NAME + 'whole_model/outer_{}'.format(OUT_START)))
         train(model_load, outer_start=OUT_START, outer_max=OUTER_MAX)
     elif MODE == 'ai_player_watching':
-        model_load = RLModel(input_size=1).to(device)
+        if MODEL_TYPE == 'RLModel':
+            model_load = RLModel(input_size=1).to(device)
+        elif MODEL_TYPE == 'NewModel':
+            model_load = NewModel(input_size=1).to(device)
         model_load.load_state_dict(torch.load(FOLDER_NAME + 'whole_model/outer_{}'.format(OUT_START)))
         ai_play_search(model_load, is_gui_on=True)
