@@ -6,9 +6,6 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '4'
 import numpy as np
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
 from game import Game
 from tetromino import Tetromino
 import random
@@ -134,7 +131,7 @@ def ai_play(model, max_games=100, mode='piece', is_gui_on=True):
             rewards = get_reward(add_scores, dones)
             i1, i2 = split_input(states)
             q = rewards + model(i1, i2).detach().numpy()
-            best = tf.argmax(q).numpy()[0]
+            best = torch.argmax(q).item()
             if mode == 'step':
                 best_moves = moves[best]
 
@@ -338,7 +335,6 @@ def gamestates_to_training_data(env, gamestates_steps):
 
 def get_data_from_playing_cnn2d(model_filename, target_size=8000, max_steps_per_episode=2000, proc_num=0,
                                 queue=None):
-    tf.autograph.set_verbosity(3)
     model = RLModel(input_size=1).to(device)
     model.load_state_dict(torch.load(model_filename))
 
@@ -375,7 +371,7 @@ def get_data_from_playing_cnn2d(model_filename, target_size=8000, max_steps_per_
             for j in range(len(dones)):
                 if dones[j]:
                     q[j] = rewards[j]
-            best = tf.argmax(q).numpy()[0] + 0
+            best = torch.argmax(q).item()
             model.train()
 
             # if hold was empty, then we don't know what's next; if hold was not empty, then we know what's next!
@@ -426,7 +422,6 @@ def get_data_from_playing_cnn2d(model_filename, target_size=8000, max_steps_per_
 
 def get_data_from_playing_search(model_filename, target_size=8000, max_steps_per_episode=1000, proc_num=0,
                                  queue=None):
-    #tf.autograph.set_verbosity(3)
     model = RLModel(input_size=1).to(device)
     model.load_state_dict(torch.load(model_filename))
     if model is None:
