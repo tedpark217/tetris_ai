@@ -2,10 +2,10 @@ GAME_BOARD_WIDTH = 10
 GAME_BOARD_HEIGHT = 20
 
 STATE_INPUT = 'short'       # 'short', 'long', 'dense'
-MODEL_TYPE = 'NewModel'       # 'RLModel', 'NewModel'
+MODEL_TYPE = 'RLModel'       # 'RLModel', 'NewModel'
 SEARCH = True
 T_SPIN_MARK = True
-OUTER_MAX = 50
+OUTER_MAX = 1
 CPU_MAX = 99                # num of cpu used to collect samples = min(multiprocessing.cpu_count(), CPU_MAX)
 
 #   1.  choose what kind of Tetris you'd like to play.
@@ -16,8 +16,8 @@ GAME_TYPE = 'regular'
 
 #   2.  folder name to store dataset and model. './anything_you_like/'
 # FOLDER_NAME = './tetris_extra/'
-#FOLDER_NAME = './tetris_regular/'
-FOLDER_NAME = './tetris_newModel/'
+FOLDER_NAME = './tetris_regular/'
+# FOLDER_NAME = './tetris_newModel/'
 
 
 #   3.  if > 0, then model {FOLDER_NAME}/whole_model/outer_{OUT_START} will be loaded to continue training or watch it play

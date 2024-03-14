@@ -14,6 +14,7 @@ from common import *
 from gui import Gui
 import time
 import multiprocessing
+import matplotlib.pyplot as plt
 
 import torch
 from torch import nn
@@ -455,6 +456,8 @@ def train(model, outer_start=0, outer_max=100):
     repeat_new_buffer = 2
     history = None
 
+    overall_epoch_losses = []
+
     for outer in range(outer_start + 1, outer_start + 1 + outer_max):
         print('======== outer = {} ========'.format(outer))
         time_outer_begin = time.time()
@@ -508,7 +511,8 @@ def train(model, outer_start=0, outer_max=100):
                 save_training_dataset_to_file(filename=FOLDER_NAME + 'dataset/dataset_{}.pkl'.format(outer),
                                               dataset=(s, target))
 
-            baseline_train(model, s, target, batch_training, epoch_training)
+            epoch_losses = baseline_train(model, s, target, batch_training, epoch_training)
+            overall_epoch_losses += epoch_losses
 
         torch.save(model.state_dict(), FOLDER_NAME + 'whole_model/outer_{}'.format(outer))
         #model.save(FOLDER_NAME + 'whole_model/outer_{}'.format(outer))
@@ -529,6 +533,8 @@ def train(model, outer_start=0, outer_max=100):
         append_record(text_)
         print('   ' + text_)'''
 
+    plot_losses(overall_epoch_losses, "loss_plot")
+
 def baseline_train(model, inputs, target, batch_size, epochs):
     criterion = nn.MSELoss()
 
@@ -536,6 +542,8 @@ def baseline_train(model, inputs, target, batch_size, epochs):
     target = torch.tensor(target)
     dataset = TensorDataset(inputs, target)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+    epoch_losses = []
 
     for epoch_count in range(epochs):
         losses = 0
@@ -552,7 +560,11 @@ def baseline_train(model, inputs, target, batch_size, epochs):
             model.zero_grad()
             losses += loss.item()
 
-        print('Epoch', (epoch_count+1), '| Losses:', round(losses/len(dataloader),3))
+        epoch_loss = round(losses/len(dataloader),3)
+        print('Epoch', (epoch_count+1), '| Losses:', epoch_loss)
+        epoch_losses.append(epoch_loss)
+
+    return epoch_losses
 
 
 def save_buffer_to_file(filename, buffer):
@@ -717,6 +729,38 @@ def get_reward(add_scores, dones, add=0):
             add_score += penalty
         reward.append(add_score + add)
     return np.array(reward).reshape([-1, 1])
+
+def plot_losses(train_losses, fname):
+    """
+    Plots the training and validation losses across epochs and saves the plot as an image file with name - fname(function argument). 
+
+    Args:
+        train_losses (list): List of training losses for each epoch.
+        val_losses (list): List of validation losses for each epoch.
+        fname (str): Name of the file to save the plot (without extension).
+
+    Returns:
+        None
+    """
+
+    # Create 'plots' directory if it doesn't exist
+
+    if not os.path.isdir('plots'):
+        os.mkdir('plots')
+
+    # Plotting training and validation losses
+    plt.plot(train_losses, label='Training Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Loss per Epoch')
+    plt.legend()
+
+    # Saving the plot as an image file in 'plots' directory
+    plt.savefig("./plots/" + fname + ".png")
+    
+    plt.clf()
+    plt.cla()
+    plt.close()
 
 
 if __name__ == "__main__":
