@@ -20,6 +20,8 @@ from torch import nn
 from torch.utils.data import TensorDataset, DataLoader
 from models import RLModel, NewModel
 
+FIRST_ITER = True
+
 # size dependent
 shape_main_grid = (-1, GAME_BOARD_HEIGHT, GAME_BOARD_WIDTH, 1)
 if STATE_INPUT == 'short':
@@ -222,7 +224,16 @@ def search_one_step(model, gamestates_old, env, gamestates_steps_old=None, rewar
     s_all = np.concatenate(s_all)
     r_all = np.concatenate(r_all)
     i1, i2 = split_input(s_all)
+    global FIRST_ITER
+    if(FIRST_ITER):
+        model.verbose = True
+        FIRST_ITER = False
+    
     q = model(i1, i2).detach().numpy() + r_all
+    
+    if(not FIRST_ITER):
+        model.verbose = False
+    
     q = torch.tensor(q)
 
     arg_sorted = torch.argsort(q.view(-1), descending=True).numpy().tolist()
@@ -241,7 +252,21 @@ def search_one_step(model, gamestates_old, env, gamestates_steps_old=None, rewar
             prev += 1
             if prev >= len(gamestates_new):
                 break
+        if prev >= len(gamestates_new):
+            break
 
+
+        if(prev >= len(arg_sorted) or prev<0):
+            print("printing prev")
+            print(prev)
+            print(arg_sorted)
+            print(len(gamestates_new))
+            print(len(arg_sorted))
+            print(q.shape)
+            
+        if(arg_sorted[prev] >= len(gamestates_new) or arg_sorted[prev] < 0):
+            print("printing arg_sorted[prev]")
+            print(arg_sorted[prev])
         gamestates_chosen.append(gamestates_new[arg_sorted[prev]])
         reward_prev_chosen.append(r_all[arg_sorted[prev]])
         gamestates_steps_chosen.append(gamestates_steps_new[arg_sorted[prev]])
@@ -535,6 +560,7 @@ def baseline_train(model, inputs, target, batch_size, epochs):
     inputs = torch.tensor(inputs)
     target = torch.tensor(target)
     dataset = TensorDataset(inputs, target)
+    
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     for epoch_count in range(epochs):
