@@ -7,21 +7,25 @@ class RectC:
         self.rect = rect
         self.color = c
 
-
 MAIN_GRID_BEGIN_CORNER = (330, 19)
 ABOVE_GRID_BEGIN_CORNER = (330, -15)
 HOLD_GRID_BEGIN_CORNER = (210, 19)
 NEXT_GRID_BEGIN_CORNER = (669, 19)
 NEXT_GRID_Y_DIFF = 80
 
+MAIN_BORAD_RECTC = RectC((325, 15, 330, 649), color.BORDER)
 SCORE_BOARD_RECTC = RectC((669, 459, 200, 200), color.LIGHT_GRAY)
+SCORE_BOARD_OUT = RectC((669, 459, 200, 200), color.BORDER)
 INFO_BOARD_RECTC = RectC((110, 459, 200, 200), color.LIGHT_GRAY)
+INFO_BOARD_OUT = RectC((110, 459, 200, 200), color.BORDER)
+
+HOLD_GRID_BORDER = RectC((206, 15, 108, 83), color.BORDER)
 
 WIN_SIZE = (1000, 700)
 
 pygame.init()
 FONT_SIZE = 16
-FONT = pygame.font.SysFont('couriernew', FONT_SIZE)            # 'couriernewbold', 'osaka'
+FONT = pygame.font.SysFont('couriernew', FONT_SIZE)            # 'couriernewbold', 'osaka', 'sfpro'
 
 class Gui:
     def __init__(self, is_display=True, delay=50):
@@ -136,22 +140,29 @@ class Gui:
                 c += 1
 
     def __paint_panels__(self):
+        pygame.draw.rect(self.win, MAIN_BORAD_RECTC.color, MAIN_BORAD_RECTC.rect,7)
+        pygame.draw.rect(self.win, HOLD_GRID_BORDER.color, HOLD_GRID_BORDER.rect,5)
+        for i in range(5):
+            NEXT_GRID_BORDER = RectC((665, 15+(i*80), 108, 83), color.BORDER)
+            pygame.draw.rect(self.win, NEXT_GRID_BORDER.color, NEXT_GRID_BORDER.rect,5)
         # score text
         pygame.draw.rect(self.win, SCORE_BOARD_RECTC.color, SCORE_BOARD_RECTC.rect)
+        pygame.draw.rect(self.win, SCORE_BOARD_OUT.color, SCORE_BOARD_OUT.rect, 5)
         lines = self.__score_board_text__.split('\n')
         i = 0
         for line in lines:
             text = FONT.render(line, True, color.BLACK)
-            self.win.blit(text, (671, 461 + i * FONT_SIZE))
+            self.win.blit(text, (678, 465 + i * FONT_SIZE))
             i += 1
 
         # info text
         pygame.draw.rect(self.win, INFO_BOARD_RECTC.color, INFO_BOARD_RECTC.rect)
+        pygame.draw.rect(self.win, INFO_BOARD_OUT.color, INFO_BOARD_OUT.rect, 5)
         lines = self.__info_board_text__.split('\n')
         i = 0
         for line in lines:
             text = FONT.render(line, True, color.BLACK)
-            self.win.blit(text, (112, 461 + i * FONT_SIZE))
+            self.win.blit(text, (119, 466 + i * FONT_SIZE))
             i += 1
 
     def set_score_text(self, score_text):
